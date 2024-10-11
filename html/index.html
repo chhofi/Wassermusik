@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Orientation and Motion Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        #output-orientation, #output-motion {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+        }
+        #rotation-bar {
+            width: 300px;
+            height: 30px;
+            background-color: #ddd;
+            position: relative;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        #indicator {
+            position: absolute;
+            height: 100%;
+            width: 50%;
+            background-color: #007bff;
+            left: 50%;
+            transform-origin: center;
+            transition: transform 0.1s;
+        }
+        #startButton {
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Rotate and Move Your Phone</h1>
+    <div id="output-orientation">Orientation: 0°</div>
+    <div id="output-motion">Acceleration: 0 m/s²</div>
+    <div id="rotation-bar">
+        <div id="indicator"></div>
+    </div>
+    <button id="startButton">Start</button>
+
+    <script>
+        // Add event listener to the button to request permissions on user gesture
+        document.getElementById('startButton').addEventListener('click', () => {
+            requestOrientationPermission();
+        });
+
+        function requestOrientationPermission() {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // Request permission for device orientation
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            initializeOrientationListener();
+                        } else {
+                            alert('Permission denied for accessing orientation data.');
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // No permission required for non-iOS devices
+                initializeOrientationListener();
+            }
+        }
+
+        function initializeOrientationListener() {
+            // Handle device orientation events
+            window.addEventListener("deviceorientation", handleOrientation);
+
+            function handleOrientation(event) {
+                const gamma = event.gamma; // Left-to-right tilt (gamma)
+
+                // Update the text output for orientation
+                const outputOrientation = document.getElementById('output-orientation');
+                outputOrientation.textContent = `Orientation: ${gamma.toFixed(2)}°`;
+
+                // Move the indicator to reflect rotation
+                const indicator = document.getElementById('indicator');
+                let position = gamma; // gamma is between -90 and 90
+                position = Math.max(-45, Math.min(45, position)); // Clamp between -45 and 45
+                let transformValue = (position / 45) * 100; // Map to percentage
+                indicator.style.transform = `translateX(${transformValue}%)`;
+            }
+        }
+
+        // Optional: Motion listener for device motion (acceleration)
+        window.addEventListener("devicemotion", handleMotion);
+
+        function handleMotion(event) {
+            const acceleration = event.accelerationIncludingGravity; // Get the acceleration values
+
+            // Update the text output for motion
+            const outputMotion = document.getElementById('output-motion');
+            outputMotion.textContent = `Acceleration: ${acceleration.x.toFixed(2)} m/s² (X-axis)`;
+        }
+    </script>
+
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Device Orientation and Motion Example</title>
+    <title>Device Orientation and Motion Example with Audio (Howler.js)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -18,7 +18,7 @@
         h1 {
             margin-bottom: 20px;
         }
-        #output-orientation, #output-motion {
+        #output-orientation, #output-motion, #output-volume {
             font-size: 1.5rem;
             margin-bottom: 20px;
         }
@@ -39,7 +39,7 @@
             transform-origin: center;
             transition: transform 0.1s;
         }
-        #startButton {
+        #startButton, #playButton, #restartButton {
             padding: 10px 20px;
             font-size: 1rem;
             cursor: pointer;
@@ -47,23 +47,48 @@
             color: white;
             border: none;
             border-radius: 5px;
+            margin: 10px;
         }
     </style>
+    <!-- Include Howler.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
 </head>
 <body>
 
     <h1>Rotate and Move Your Phone</h1>
     <div id="output-orientation">Orientation: 0°</div>
     <div id="output-motion">Acceleration: 0 m/s²</div>
+    <div id="output-volume">Volume: 0.5</div>
     <div id="rotation-bar">
         <div id="indicator"></div>
     </div>
     <button id="startButton">Start</button>
+    <button id="playButton">Play Audio</button>
+    <button id="restartButton">Restart</button>
 
     <script>
+        // Initialize the Howl object
+        var sound = new Howl({
+            src: ['test.mp3'],
+            volume: 0.5 // initial volume
+        });
+
+        const playButton = document.getElementById('playButton');
+        const restartButton = document.getElementById('restartButton');
+        const outputVolume = document.getElementById('output-volume'); // Reference for volume output
+
         // Add event listener to the button to request permissions on user gesture
         document.getElementById('startButton').addEventListener('click', () => {
             requestOrientationPermission();
+        });
+
+        playButton.addEventListener('click', () => {
+            sound.play();
+        });
+
+        restartButton.addEventListener('click', () => {
+            sound.stop();
+            sound.play();
         });
 
         function requestOrientationPermission() {
@@ -101,6 +126,23 @@
                 position = Math.max(-45, Math.min(45, position)); // Clamp between -45 and 45
                 let transformValue = (position / 45) * 100; // Map to percentage
                 indicator.style.transform = `translateX(${transformValue}%)`;
+
+                // Map gamma (-50 to 50) to volume (0 to 1)
+                let volume;
+                if (gamma <= -50) {
+                    volume = 0;
+                } else if (gamma >= 50) {
+                    volume = 1;
+                } else {
+                    // Normalize gamma to be between -50 and 50, then map to volume
+                    volume = (gamma + 50) / 100; // gamma=-50 -> volume=0, gamma=50 -> volume=1
+                }
+
+                // Set the volume on the Howl object
+                sound.volume(volume);
+
+                // Update the displayed volume for debugging
+                outputVolume.textContent = `Volume: ${volume.toFixed(2)}`;
             }
         }
 

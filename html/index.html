@@ -7,6 +7,10 @@
     <title>Wassermusik</title>
     <link rel="icon" href="/images/favicon.ico" type="image/x-icon">
     <link rel="manifest" href="/manifest.json">
+    
+    <!-- Include the Unmute Library -->
+    <script src="unmute.js"></script> <!-- Ensure this path is correct based on your project structure -->
+
     <!-- Styles -->
     <style>
         /* Existing styles */
@@ -174,19 +178,19 @@
 
     <!-- Script -->
     <script>
-
+        // Register the Service Worker (ensure this is only done once)
         if ('serviceWorker' in navigator) {
-                    window.addEventListener('load', () => {
-                        navigator.serviceWorker.register('/service-worker.js')
-                            .then(registration => {
-                                console.log('ServiceWorker registered with scope: ', registration.scope);
-                            })
-                            .catch(error => {
-                                console.log('ServiceWorker registration failed: ', error);
-                            });
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registered with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed: ', error);
                     });
-                }
-                
+            });
+        }
+
         // Existing variables
         let orientationPermissionGranted = false;
         let debug = false; // Set debug mode to false by default
@@ -225,7 +229,7 @@
             if (isMobileDevice()) {
                 // Hide the slider
                 sliderContainer.style.display = 'none';
-                // Show the orientation-related elements
+                // Show the orientation-related elements if in debug mode
                 if (debug) {
                     outputOrientation.style.display = 'block';
                     rotationBar.style.display = 'block';
@@ -282,6 +286,16 @@
         // Set up the Web Audio API context
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
+        // Integrate Unmute functionality
+        let allowBackgroundPlayback = false; // default false, recommended false
+        let forceIOSBehavior = false; // default false, recommended false
+        let unmuteHandle = null;
+
+        if (audioContext) {
+            // Initialize Unmute to handle audio autoplay restrictions
+            unmuteHandle = unmute(audioContext, allowBackgroundPlayback, forceIOSBehavior);
+        }
+
         // Create a ChannelSplitterNode to split the 4-channel audio into individual channels
         const splitter = audioContext.createChannelSplitter(4);
 
@@ -308,78 +322,78 @@
         gainNode2_L.gain.value = gainNode2_R.gain.value = 0.5;
 
         startButton.addEventListener('click', () => {
-    const title = document.querySelector('h1');
-    if (!isPlaying) {
-        if (isMobileDevice()) {
-            // Request orientation permission for mobile devices (iOS especially)
-            requestOrientationPermission();
-        }
-        loadAudio();
-        startButton.textContent = 'Stop';
-        title.style.opacity = '0'; // Fade out instruction text
-    } else {
-        stopAudio();
-        startButton.textContent = 'Start';
-        title.style.opacity = '1'; // Fade in instruction text
-    }
-    isPlaying = !isPlaying;
-});
-
-function loadAudio() {
-    if (audioBuffer) {
-        // Audio is already loaded, play it
-        playAudio();
-        return;
-    }
-
-    // Show loading indicator
-    loadingIndicator.style.display = 'block';
-    startButton.disabled = true;
-
-    // Fetch and decode the audio data
-    fetch('audio/version5.m4a')
-        .then(response => response.arrayBuffer())
-        .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
-        .then(decodedData => {
-            audioBuffer = decodedData;
-            loadingIndicator.style.display = 'none'; // Hide loading indicator
-            startButton.disabled = false;
-            playAudio(); // Play audio once loaded
-        })
-        .catch(error => {
-            console.error('Error loading audio:', error);
+            const title = document.querySelector('h1');
+            if (!isPlaying) {
+                if (isMobileDevice()) {
+                    // Request orientation permission for mobile devices (iOS especially)
+                    requestOrientationPermission();
+                }
+                loadAudio();
+                startButton.textContent = 'Stop';
+                title.style.opacity = '0'; // Fade out instruction text
+            } else {
+                stopAudio();
+                startButton.textContent = 'Start';
+                title.style.opacity = '1'; // Fade in instruction text
+            }
+            isPlaying = !isPlaying;
         });
-}
 
-function playAudio() {
-    audioContext.resume().then(() => {
-        // Create a new buffer source
-        audioSource = audioContext.createBufferSource();
-        audioSource.buffer = audioBuffer;
+        function loadAudio() {
+            if (audioBuffer) {
+                // Audio is already loaded, play it
+                playAudio();
+                return;
+            }
 
-        // Connect the audio source to the splitter and gain nodes
-        audioSource.connect(splitter);
-        splitter.connect(gainNode1_L, 0);
-        splitter.connect(gainNode1_R, 1);
-        splitter.connect(gainNode2_L, 2);
-        splitter.connect(gainNode2_R, 3);
+            // Show loading indicator
+            loadingIndicator.style.display = 'block';
+            startButton.disabled = true;
 
-        // Start the audio
-        audioStartTime = audioContext.currentTime;
-        audioDuration = audioBuffer.duration;
-        audioSource.start(0);
+            // Fetch and decode the audio data
+            fetch('audio/version5.m4a')
+                .then(response => response.arrayBuffer())
+                .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+                .then(decodedData => {
+                    audioBuffer = decodedData;
+                    loadingIndicator.style.display = 'none'; // Hide loading indicator
+                    startButton.disabled = false;
+                    playAudio(); // Play audio once loaded
+                })
+                .catch(error => {
+                    console.error('Error loading audio:', error);
+                });
+        }
 
-        // Start progress update
-        startProgressUpdate();
+        function playAudio() {
+            audioContext.resume().then(() => {
+                // Create a new buffer source
+                audioSource = audioContext.createBufferSource();
+                audioSource.buffer = audioBuffer;
 
-        // Handle audio end event
-        audioSource.onended = () => {
-            stopAudio();
-            startButton.textContent = 'Start';
-            isPlaying = false;
-        };
-    });
-}
+                // Connect the audio source to the splitter and gain nodes
+                audioSource.connect(splitter);
+                splitter.connect(gainNode1_L, 0);
+                splitter.connect(gainNode1_R, 1);
+                splitter.connect(gainNode2_L, 2);
+                splitter.connect(gainNode2_R, 3);
+
+                // Start the audio
+                audioStartTime = audioContext.currentTime;
+                audioDuration = audioBuffer.duration;
+                audioSource.start(0);
+
+                // Start progress update
+                startProgressUpdate();
+
+                // Handle audio end event
+                audioSource.onended = () => {
+                    stopAudio();
+                    startButton.textContent = 'Start';
+                    isPlaying = false;
+                };
+            });
+        }
 
         function stopAudio() {
             if (audioSource) {
@@ -554,19 +568,6 @@ function playAudio() {
             releaseWakeLock();
         });
 
-        // Register the service worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(registration => {
-                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
-                    })
-                    .catch(error => {
-                        console.log('ServiceWorker registration failed: ', error);
-                    });
-            });
-        }
-
         // Lock screen orientation to portrait mode
         if (screen.orientation && screen.orientation.lock) {
             screen.orientation.lock('portrait').catch(function(error) {
@@ -579,6 +580,8 @@ function playAudio() {
             initializeApp();
         }
 
+        // Note: Ensure that the `unmute` function is defined in the `unmute.js` you included.
+        // The `unmute` library should handle user interactions to allow audio playback without requiring manual unmute.
     </script>
 
 </body>

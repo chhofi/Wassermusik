@@ -5,7 +5,6 @@ const urlsToCache = [
     '/manifest.json',
     '/images/wasservioline.webp',
     '/images/violine.webp',
-    '/audio/version2.flac',
 ];
 
 // Install the service worker and cache resources

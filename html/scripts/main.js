@@ -1,4 +1,3 @@
-
 // Register the Service Worker (ensure this is only done once)
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -14,7 +13,7 @@ if ('serviceWorker' in navigator) {
 
 // Existing variables
 let orientationPermissionGranted = false;
-let debug = false; // Set debug mode to false by default
+let debug = true; // Set debug mode to false by default
 let isPlaying = false; // Track if the audio is playing
 
 // Existing element references
@@ -142,23 +141,50 @@ merger.connect(audioContext.destination);
 gainNode1_L.gain.value = gainNode1_R.gain.value = 0.5;
 gainNode2_L.gain.value = gainNode2_R.gain.value = 0.5;
 
-startButton.addEventListener('click', () => {
-    const title = document.querySelector('h1');
-    if (!isPlaying) {
-        if (isMobileDevice()) {
-            // Request orientation permission for mobile devices (iOS especially)
-            requestOrientationPermission();
+// --- Wake Lock Functionality with NoSleep.js ---
+
+// Initialize NoSleep.js
+const noSleep = new NoSleep();
+
+// Flag to track wake lock state
+let wakeLockEnabled = false;
+
+// Event listener for the start button to enable wake lock
+if (startButton) {
+    startButton.addEventListener('click', () => {
+        const title = document.querySelector('h1');
+        if (!isPlaying) {
+            if (isMobileDevice()) {
+                // Request orientation permission for mobile devices (iOS especially)
+                requestOrientationPermission();
+            }
+            loadAudio();
+            startButton.textContent = 'Stop';
+            title.style.opacity = '0'; // Fade out instruction text
+
+            // Enable NoSleep.js to keep the screen awake
+            if (!wakeLockEnabled) {
+                noSleep.enable(); // Enable wake lock to keep the screen on
+                wakeLockEnabled = true;
+                console.log('Wake Lock enabled via NoSleep.js');
+            }
+        } else {
+            stopAudio();
+            startButton.textContent = 'Start';
+            title.style.opacity = '1'; // Fade in instruction text
+
+            // Disable NoSleep.js to allow the screen to turn off
+            if (wakeLockEnabled) {
+                noSleep.disable(); // Disable wake lock to allow screen to turn off
+                wakeLockEnabled = false;
+                console.log('Wake Lock disabled via NoSleep.js');
+            }
         }
-        loadAudio();
-        startButton.textContent = 'Stop';
-        title.style.opacity = '0'; // Fade out instruction text
-    } else {
-        stopAudio();
-        startButton.textContent = 'Start';
-        title.style.opacity = '1'; // Fade in instruction text
-    }
-    isPlaying = !isPlaying;
-});
+        isPlaying = !isPlaying;
+    });
+} else {
+    console.warn('Start button not found. Please ensure there is a button with id "startButton" in your HTML.');
+}
 
 function loadAudio() {
     if (audioBuffer) {
@@ -212,6 +238,13 @@ function playAudio() {
             stopAudio();
             startButton.textContent = 'Start';
             isPlaying = false;
+
+            // Optionally disable NoSleep.js when audio ends
+            if (wakeLockEnabled) {
+                noSleep.disable();
+                wakeLockEnabled = false;
+                console.log('Wake Lock disabled via NoSleep.js');
+            }
         };
     });
 }
@@ -224,6 +257,13 @@ function stopAudio() {
     }
     audioContext.suspend();
     stopProgressUpdate();
+
+    // Optionally disable NoSleep.js when stopping audio
+    if (wakeLockEnabled) {
+        noSleep.disable();
+        wakeLockEnabled = false;
+        console.log('Wake Lock disabled via NoSleep.js');
+    }
 }
 
 function startProgressUpdate() {
@@ -289,6 +329,13 @@ function seekAudio(seekTime) {
         stopAudio();
         startButton.textContent = 'Start';
         isPlaying = false;
+
+        // Optionally disable NoSleep.js when audio ends
+        if (wakeLockEnabled) {
+            noSleep.disable();
+            wakeLockEnabled = false;
+            console.log('Wake Lock disabled via NoSleep.js');
+        }
     };
 
     audioStartTime = audioContext.currentTime - seekTime;
@@ -341,7 +388,7 @@ function handleOrientation(event) {
     }
 
     // Adjust so 35 degrees becomes the new "neutral" point (equal volume for both sources)
-    const offsetBeta = beta - 20;
+    const offsetBeta = beta - 35;
 
     // Map offsetBeta (-45 to 45) to adjust gain between the two sources
     let normalized = (offsetBeta + 45) / 90; // Normalize offsetBeta to a value between 0 and 1
@@ -349,45 +396,6 @@ function handleOrientation(event) {
 
     updateMix(normalized);
 }
-
-// Wake Lock API for preventing the screen from turning off
-let wakeLock = null;
-
-// Request a wake lock
-async function requestWakeLock() {
-    try {
-        wakeLock = await navigator.wakeLock.request('screen');
-        console.log('Wake Lock activated!');
-
-        // Re-activate wake lock when it is released
-        wakeLock.addEventListener('release', () => {
-            console.log('Wake Lock was released');
-        });
-    } catch (err) {
-        console.error(`${err.name}, ${err.message}`);
-    }
-}
-
-// Release the wake lock when it is not needed anymore
-function releaseWakeLock() {
-    if (wakeLock !== null) {
-        wakeLock.release()
-            .then(() => {
-                console.log('Wake Lock released');
-                wakeLock = null;
-            });
-    }
-}
-
-// Request wake lock when page is loaded
-window.addEventListener('load', () => {
-    requestWakeLock();
-});
-
-// Release the wake lock when page is closed or user navigates away
-window.addEventListener('beforeunload', () => {
-    releaseWakeLock();
-});
 
 // Lock screen orientation to portrait mode
 if (screen.orientation && screen.orientation.lock) {
@@ -400,6 +408,3 @@ if (screen.orientation && screen.orientation.lock) {
 window.onload = function() {
     initializeApp();
 }
-
-// Note: Ensure that the `unmute` function is defined in the `unmute.js` you included.
-// The `unmute` library should handle user interactions to allow audio playback without requiring manual unmute.

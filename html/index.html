@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wassermusik</title>
 
+    <link rel="manifest" href="/manifest.json">
     <!-- Styles -->
     <style>
         /* Existing styles */
@@ -163,7 +164,7 @@
     <!-- Loading Indicator -->
     <div id="loading-indicator"></div>
     <!-- Offline Indicator -->
-    <div id="offline-indicator">You are offline. Using cached resources.</div>
+    <div id="offline-indicator">offline mode</div>
     <!-- Progress Bar -->
     <div id="progress-container">
         <div id="progress-bar"></div>
@@ -173,6 +174,19 @@
 
     <!-- Script -->
     <script>
+
+        if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', () => {
+                        navigator.serviceWorker.register('/service-worker.js')
+                            .then(registration => {
+                                console.log('ServiceWorker registered with scope: ', registration.scope);
+                            })
+                            .catch(error => {
+                                console.log('ServiceWorker registration failed: ', error);
+                            });
+                    });
+                }
+                
         // Existing variables
         let orientationPermissionGranted = false;
         let debug = false; // Set debug mode to false by default

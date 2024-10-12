@@ -1,11 +1,11 @@
 {
     "name": "Device Orientation Audio Mixer",
-    "short_name": "Audio Mixer",
+    "short_name": "Wassermusik",
     "description": "Mix audio by rotating your phone.",
-    "start_url": "./index.html",
+    "start_url": "/",
     "display": "standalone",
-    "background_color": "#f0f0f0",
-    "theme_color": "#007bff",
+    "background_color": "#ffffff",
+    "theme_color": "#ffffff",
     "icons": [
       {
         "src": "icon-192x192.png",

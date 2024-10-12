@@ -3,11 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Device Orientation Audio Mixer</title>
 
     <!-- Link to manifest -->
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/manifest.json">
     
+    <!-- Add to home screen for Safari on iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="Device Orientation Audio Mixer">
+    <link rel="apple-touch-icon" href="./images/icon-192x192.png">
+    <meta name="msapplication-TileImage" content="./images/icon-192x192.png">
+    <meta name="msapplication-TileColor" content="#3367D6">
+
     <!-- Theme color for the browser -->
     <meta name="theme-color" content="#007bff">
 
@@ -97,6 +106,12 @@
             transition: opacity 0s; /* No fade transition */
             object-fit: cover; /* Ensure the image covers the whole screen */
         }
+        #offline-indicator {
+            display: none;
+            color: red;
+            font-size: 1.2rem;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -115,10 +130,14 @@
     <!-- Loading Indicator -->
     <div id="loading-indicator"></div>
 
+    <!-- Offline Indicator -->
+    <div id="offline-indicator">You are offline. Using cached resources.</div>
+
     <!-- Single Audio Player -->
-    <audio id="audio-player" src="audio/version2.flac" preload="auto"></audio> <!-- preload set to 'auto' -->
+    <audio id="audio-player" src="audio/version2.flac" preload="auto"></audio>
 
     <script>
+
         let orientationPermissionGranted = false;
         let debug = false; // Set debug mode to false by default
         let isPlaying = false; // Track if the audio is playing
@@ -130,6 +149,22 @@
         const rotationBar = document.getElementById('rotation-bar');
         const image1 = document.getElementById('image1');
         const image2 = document.getElementById('image2');
+        const offlineIndicator = document.getElementById('offline-indicator');
+
+        // Show offline indicator if offline
+        window.addEventListener('load', () => {
+            if (!navigator.onLine) {
+                offlineIndicator.style.display = 'block';
+            }
+        });
+
+        window.addEventListener('online', () => {
+            offlineIndicator.style.display = 'none';
+        });
+
+        window.addEventListener('offline', () => {
+            offlineIndicator.style.display = 'block';
+        });
 
         // Set visibility based on debug mode
         function updateDebugVisibility() {
@@ -173,12 +208,9 @@
         const merger = audioContext.createChannelMerger(2);
 
         // Connect the GainNodes to the merger
-        // Left channels to input 0 (left)
-        gainNode1_L.connect(merger, 0, 0);
+        gainNode1_L.connect(merger, 0, 0); // Left channels to input 0 (left)
         gainNode2_L.connect(merger, 0, 0);
-
-        // Right channels to input 1 (right)
-        gainNode1_R.connect(merger, 0, 1);
+        gainNode1_R.connect(merger, 0, 1); // Right channels to input 1 (right)
         gainNode2_R.connect(merger, 0, 1);
 
         // Connect the merger to the audio context destination (speakers)
@@ -204,16 +236,19 @@
         });
 
         function downloadAudio() {
-            // Show loading indicator
+            // Show loading indicator and disable the button
             loadingIndicator.style.display = 'block';
+            startButton.disabled = true;
 
             // Resume the audio context
             audioContext.resume();
 
             // Set up event listener for 'loadeddata' event (fired when the entire audio is loaded)
             audioPlayer.addEventListener('loadeddata', () => {
-                // Hide loading indicator
+                // Hide loading indicator and enable the button
                 loadingIndicator.style.display = 'none';
+                startButton.disabled = false;
+
                 // Play the audio file after it has fully downloaded
                 audioPlayer.play();
             });

@@ -49,6 +49,21 @@
             border-radius: 5px;
             margin: 10px;
         }
+        /* Loading Spinner Styles */
+        #loading-indicator {
+            border: 8px solid #f3f3f3; /* Light grey */
+            border-top: 8px solid #007bff; /* Blue */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            display: none; /* Hidden by default */
+            margin-top: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -61,10 +76,13 @@
     <button id="startButton">Start</button>
     <button id="playButton">Play Audio</button>
 
+    <!-- Loading Indicator -->
+    <div id="loading-indicator"></div>
+
     <!-- First Audio Player -->
-    <audio id="audio-player1" src="test.mp3"></audio>
+    <audio id="audio-player1" src="wasser.mp3" preload="none"></audio>
     <!-- Second Audio Player -->
-    <audio id="audio-player2" src="test2.mp3"></audio>
+    <audio id="audio-player2" src="orchester.mp3" preload="none"></audio>
 
     <script>
         let orientationPermissionGranted = false;
@@ -72,6 +90,7 @@
         const audioPlayer1 = document.getElementById('audio-player1');
         const audioPlayer2 = document.getElementById('audio-player2');
         const playButton = document.getElementById('playButton');
+        const loadingIndicator = document.getElementById('loading-indicator');
 
         // Set up the Web Audio API context
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -100,11 +119,38 @@
         });
 
         playButton.addEventListener('click', () => {
-            audioContext.resume().then(() => {
-                audioPlayer1.play();
-                audioPlayer2.play();
-            });
+            // Show loading indicator
+            loadingIndicator.style.display = 'block';
+
+            // Start preloading the audio files
+            preloadAudio();
         });
+
+        function preloadAudio() {
+            let audioLoadedCount = 0;
+
+            // Resume the audio context
+            audioContext.resume();
+
+            function checkAllAudioLoaded() {
+                audioLoadedCount++;
+                if (audioLoadedCount === 2) {
+                    // Hide loading indicator
+                    loadingIndicator.style.display = 'none';
+                    // Play both audio files
+                    audioPlayer1.play();
+                    audioPlayer2.play();
+                }
+            }
+
+            // Set up event listeners for 'canplaythrough'
+            audioPlayer1.addEventListener('canplaythrough', checkAllAudioLoaded, { once: true });
+            audioPlayer2.addEventListener('canplaythrough', checkAllAudioLoaded, { once: true });
+
+            // Start loading the audio files
+            audioPlayer1.load();
+            audioPlayer2.load();
+        }
 
         function requestOrientationPermission() {
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {

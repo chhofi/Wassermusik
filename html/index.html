@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Device Orientation and Motion Example with Audio (Howler.js)</title>
+    <title>Device Orientation Audio Mixer (Howler.js)</title>
     <style>
+        /* [Styles remain the same] */
         body {
             font-family: Arial, sans-serif;
             display: flex;
@@ -55,10 +56,9 @@
 </head>
 <body>
 
-    <h1>Rotate and Move Your Phone</h1>
+    <h1>Rotate Your Phone to Mix Audio</h1>
     <div id="output-orientation">Orientation: 0°</div>
-    <div id="output-motion">Acceleration: 0 m/s²</div>
-    <div id="output-volume">Volume: 0.5</div>
+    <div id="output-volume">Song A Volume: 0.5 | Song B Volume: 0.5</div>
     <div id="rotation-bar">
         <div id="indicator"></div>
     </div>
@@ -67,11 +67,9 @@
     <button id="restartButton">Restart</button>
 
     <script>
-        // Initialize the Howl object
-        var sound = new Howl({
-            src: ['test.mp3'],
-            volume: 0.5 // initial volume
-        });
+        // Declare the sound variables without initializing
+        var soundA;
+        var soundB;
 
         const playButton = document.getElementById('playButton');
         const restartButton = document.getElementById('restartButton');
@@ -83,12 +81,39 @@
         });
 
         playButton.addEventListener('click', () => {
-            sound.play();
+            // Initialize the Howl objects inside a user interaction
+            if (!soundA && !soundB) {
+                soundA = new Howl({
+                    src: ['test.mp3'],
+                    loop: true,
+                    volume: 0.5 // initial volume
+                });
+                soundB = new Howl({
+                    src: ['test2.mp3'],
+                    loop: true,
+                    volume: 0.5 // initial volume
+                });
+            }
+
+            // Resume AudioContext if suspended (iOS fix)
+            if (Howler.ctx.state === 'suspended') {
+                Howler.ctx.resume().then(() => {
+                    soundA.play();
+                    soundB.play();
+                });
+            } else {
+                soundA.play();
+                soundB.play();
+            }
         });
 
         restartButton.addEventListener('click', () => {
-            sound.stop();
-            sound.play();
+            if (soundA && soundB) {
+                soundA.stop();
+                soundB.stop();
+                soundA.play();
+                soundB.play();
+            }
         });
 
         function requestOrientationPermission() {
@@ -127,34 +152,32 @@
                 let transformValue = (position / 45) * 100; // Map to percentage
                 indicator.style.transform = `translateX(${transformValue}%)`;
 
-                // Map gamma (-50 to 50) to volume (0 to 1)
-                let volume;
-                if (gamma <= -50) {
-                    volume = 0;
-                } else if (gamma >= 50) {
-                    volume = 1;
+                // Map gamma (-45 to 45) to volumes for songA and songB
+                let volumeA, volumeB;
+                if (gamma <= -45) {
+                    volumeA = 1; // Full volume for songA
+                    volumeB = 0; // Mute songB
+                } else if (gamma >= 45) {
+                    volumeA = 0; // Mute songA
+                    volumeB = 1; // Full volume for songB
                 } else {
-                    // Normalize gamma to be between -50 and 50, then map to volume
-                    volume = (gamma + 50) / 100; // gamma=-50 -> volume=0, gamma=50 -> volume=1
+                    // Calculate volumes based on tilt
+                    // Normalize gamma from -45 to 45 into a range of 0 to 1
+                    let normalized = (gamma + 45) / 90;
+                    volumeA = 1 - normalized; // Inverse for songA
+                    volumeB = normalized;     // Direct for songB
                 }
 
-                // Set the volume on the Howl object
-                sound.volume(volume);
+                // Set the volumes on the Howl objects if they're initialized
+                if (soundA && soundB) {
+                    // Note: Programmatic volume changes may not work on iOS
+                    soundA.volume(volumeA);
+                    soundB.volume(volumeB);
+                }
 
-                // Update the displayed volume for debugging
-                outputVolume.textContent = `Volume: ${volume.toFixed(2)}`;
+                // Update the displayed volumes for debugging
+                outputVolume.textContent = `Song A Volume: ${volumeA.toFixed(2)} | Song B Volume: ${volumeB.toFixed(2)}`;
             }
-        }
-
-        // Optional: Motion listener for device motion (acceleration)
-        window.addEventListener("devicemotion", handleMotion);
-
-        function handleMotion(event) {
-            const acceleration = event.accelerationIncludingGravity; // Get the acceleration values
-
-            // Update the text output for motion
-            const outputMotion = document.getElementById('output-motion');
-            outputMotion.textContent = `Acceleration: ${acceleration.x.toFixed(2)} m/s² (X-axis)`;
         }
     </script>
 

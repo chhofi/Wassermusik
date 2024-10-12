@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Device Orientation Audio Mixer with Audio Pool</title>
+    <title>Device Orientation Audio Mixer</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -18,7 +18,7 @@
         h1 {
             margin-bottom: 20px;
         }
-        #output-orientation, #output-volume {
+        #output-orientation {
             font-size: 1.5rem;
             margin-bottom: 20px;
         }
@@ -39,7 +39,7 @@
             transform-origin: center;
             transition: transform 0.1s;
         }
-        #startButton, #playButton, #restartButton {
+        #startButton, #playButton {
             padding: 10px 20px;
             font-size: 1rem;
             cursor: pointer;
@@ -55,59 +55,55 @@
 
     <h1>Rotate Your Phone to Mix Audio</h1>
     <div id="output-orientation">Orientation: 0°</div>
-    <div id="output-volume">Song A Volume: 0.5 | Song B Volume: 0.5</div>
     <div id="rotation-bar">
         <div id="indicator"></div>
     </div>
     <button id="startButton">Start</button>
     <button id="playButton">Play Audio</button>
-    <button id="restartButton">Restart</button>
+
+    <!-- First Audio Player -->
+    <audio id="audio-player1" src="test.mp3"></audio>
+    <!-- Second Audio Player -->
+    <audio id="audio-player2" src="test2.mp3"></audio>
 
     <script>
-        // Define the audio pool for each sound
-        const audioPoolA = [];
-        const audioPoolB = [];
-        const maxAudioElements = 5; // Number of audio elements in the pool
-
-        // Preload audio into the pool
-        function preloadAudio() {
-            for (let i = 0; i < maxAudioElements; i++) {
-                const audioA = new Audio('audio/test.mp3'); // Path to your audio file
-                const audioB = new Audio('audio/test2.mp3'); // Path to your audio file
-                audioPoolA.push(audioA);
-                audioPoolB.push(audioB);
-            }
-        }
-
-        // Play sound from the pool
-        function playSound(pool) {
-            const audio = pool.find(a => a.paused);
-            if (audio) {
-                audio.currentTime = 0; // Reset to start
-                audio.play(); // Play the audio
-            }
-        }
-
         let orientationPermissionGranted = false;
+
+        const audioPlayer1 = document.getElementById('audio-player1');
+        const audioPlayer2 = document.getElementById('audio-player2');
+        const playButton = document.getElementById('playButton');
+
+        // Set up the Web Audio API context
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Set up first audio source and gain node
+        const audioSource1 = audioContext.createMediaElementSource(audioPlayer1);
+        const gainNode1 = audioContext.createGain();
+
+        // Set up second audio source and gain node
+        const audioSource2 = audioContext.createMediaElementSource(audioPlayer2);
+        const gainNode2 = audioContext.createGain();
+
+        // Connect the audio elements to their respective GainNodes and then to the destination (speakers)
+        audioSource1.connect(gainNode1);
+        gainNode1.connect(audioContext.destination);
+
+        audioSource2.connect(gainNode2);
+        gainNode2.connect(audioContext.destination);
+
+        // Set initial volume for both audios
+        gainNode1.gain.value = 1.0;
+        gainNode2.gain.value = 1.0;
 
         document.getElementById('startButton').addEventListener('click', () => {
             requestOrientationPermission();
         });
 
-        document.getElementById('playButton').addEventListener('click', async () => {
-            // Start playing sounds if orientation permission is granted
-            if (orientationPermissionGranted) {
-                playSound(audioPoolA);
-                playSound(audioPoolB);
-            }
-        });
-
-        document.getElementById('restartButton').addEventListener('click', () => {
-            // Restart both sounds
-            audioPoolA.forEach(audio => audio.pause());
-            audioPoolB.forEach(audio => audio.pause());
-            playSound(audioPoolA);
-            playSound(audioPoolB);
+        playButton.addEventListener('click', () => {
+            audioContext.resume().then(() => {
+                audioPlayer1.play();
+                audioPlayer2.play();
+            });
         });
 
         function requestOrientationPermission() {
@@ -116,7 +112,6 @@
                     .then(permissionState => {
                         if (permissionState === 'granted') {
                             orientationPermissionGranted = true;
-                            preloadAudio(); // Preload audio files after permission is granted
                             initializeOrientationListener();
                         } else {
                             alert('Permission denied for accessing orientation data.');
@@ -125,7 +120,6 @@
                     .catch(console.error);
             } else {
                 orientationPermissionGranted = true;
-                preloadAudio(); // Preload audio files for non-iOS devices
                 initializeOrientationListener();
             }
         }
@@ -163,17 +157,10 @@
                 volumeB = normalized; // Direct for songB
             }
 
-            // Update volume of audio elements in the pool
-            audioPoolA.forEach(audio => audio.volume = volumeA);
-            audioPoolB.forEach(audio => audio.volume = volumeB);
-
-            // Update the displayed volumes for debugging
-            const outputVolume = document.getElementById('output-volume');
-            outputVolume.textContent = `Song A Volume: ${volumeA.toFixed(2)} | Song B Volume: ${volumeB.toFixed(2)}`;
+            // Update volume of audio elements using GainNodes
+            gainNode1.gain.value = volumeA;
+            gainNode2.gain.value = volumeB;
         }
-
-        // Preload audio files on page load
-        preloadAudio();
     </script>
 
 </body>

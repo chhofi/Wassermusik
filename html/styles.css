@@ -1,0 +1,130 @@
+
+/* Existing styles */
+
+/* Add styles for the slider */
+#slider-container {
+    margin: 20px;
+    display: none; /* Hidden by default */
+    color: white;
+}
+#slider-container label {
+    margin-right: 10px;
+}
+#mixerSlider {
+    width: 300px;
+}
+/* Adjust existing styles */
+#output-orientation, #rotation-bar {
+    display: none; /* Hidden by default */
+}
+
+/* Rest of the styles remain the same */
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+    color: white;
+    background-color: #333;
+}
+h1 {
+    margin-bottom: 20px;
+    padding: 20px;
+    color: white;
+    text-align: center;
+    opacity: 1;
+    transition: opacity 0.5s ease;
+}
+#output-orientation {
+    font-size: 1.5rem;
+    margin-bottom: 20px;
+    color: white;
+}
+#rotation-bar {
+    width: 300px;
+    height: 30px;
+    background-color: #ddd;
+    position: relative;
+    border-radius: 15px;
+    overflow: hidden;
+}
+#indicator {
+    position: absolute;
+    height: 100%;
+    width: 50%;
+    background-color: #007bff;
+    left: 50%;
+    transform-origin: center;
+    transition: transform 0.1s;
+}
+#startButton{
+    padding: 10px 20px;
+    font-size: 1rem;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    margin: 10px;
+}
+#loading-indicator {
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid #007bff;
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    animation: spin 1s linear infinite;
+    display: none;
+    margin-top: 20px;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+#image-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    z-index: -1;
+}
+.image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    transition: opacity 0s;
+    object-fit: cover;
+}
+#offline-indicator {
+    display: none;
+    color: red;
+    font-size: 1.2rem;
+    margin-top: 10px;
+}
+/* Add styles for progress bar */
+#progress-container {
+    width: 80%;
+    height: 10px;
+    background-color: #444;
+    margin-top: 20px;
+    cursor: pointer;
+    border-radius: 5px;
+    overflow: hidden;
+}
+#progress-bar {
+    width: 0%;
+    height: 100%;
+    background-color: #007bff;
+}
+#time-display {
+    margin-top: 5px;
+    color: white;
+}

@@ -3,7 +3,7 @@ version: '3.8'
 services:
   webserver:
     image: nginx:latest
-    container_name: nginx_webserver
+    container_name: wassermusik
     ports:
       - "3562:80"
     volumes:

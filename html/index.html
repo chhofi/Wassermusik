@@ -71,11 +71,35 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Styles for the images */
+        #image-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            z-index: -1; /* Make the images stay in the background */
+        }
+        .image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            transition: opacity 0s; /* No fade transition */
+            object-fit: cover; /* Ensure the image covers the whole screen */
+        }
     </style>
 </head>
 <body>
 
-    <h1>Tilt Your Phone to Mix Audio</h1>
+    <h1>Tilt Your Phone to Mix Audio and Images</h1>
+    <div id="image-container">
+        <img id="image1" class="image" src="images/wasservioline.webp" alt="Wasservioline">
+        <img id="image2" class="image" src="images/violine.webp" alt="Violine">
+    </div>
     <div id="output-orientation">Orientation: 0°</div>
     <div id="rotation-bar">
         <div id="indicator"></div>
@@ -90,10 +114,29 @@
 
     <script>
         let orientationPermissionGranted = false;
+        let debug = false; // Set debug mode to false by default
 
         const audioPlayer = document.getElementById('audio-player');
         const startButton = document.getElementById('startButton');
         const loadingIndicator = document.getElementById('loading-indicator');
+        const outputOrientation = document.getElementById('output-orientation');
+        const rotationBar = document.getElementById('rotation-bar');
+        const image1 = document.getElementById('image1');
+        const image2 = document.getElementById('image2');
+
+        // Set visibility based on debug mode
+        function updateDebugVisibility() {
+            if (debug) {
+                outputOrientation.style.display = 'block';
+                rotationBar.style.display = 'block';
+            } else {
+                outputOrientation.style.display = 'none';
+                rotationBar.style.display = 'none';
+            }
+        }
+
+        // Initialize with debug mode off
+        updateDebugVisibility();
 
         // Set up the Web Audio API context
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -174,16 +217,19 @@
         function handleOrientation(event) {
             const beta = event.beta; // Front-to-back tilt (beta)
 
-            // Update the text output for orientation
-            const outputOrientation = document.getElementById('output-orientation');
-            outputOrientation.textContent = `Orientation: ${beta.toFixed(2)}°`;
+            // Update the text output for orientation only if debug is true
+            if (debug) {
+                outputOrientation.textContent = `Orientation: ${beta.toFixed(2)}°`;
+            }
 
-            // Move the indicator to reflect rotation
-            const indicator = document.getElementById('indicator');
-            let position = beta; // beta is between -180 and 180
-            position = Math.max(-45, Math.min(45, position)); // Clamp between -45 and 45
-            let transformValue = (position / 45) * 100; // Map to percentage
-            indicator.style.transform = `translateX(${transformValue}%)`;
+            // Move the indicator to reflect rotation if debug is true
+            if (debug) {
+                const indicator = document.getElementById('indicator');
+                let position = beta; // beta is between -180 and 180
+                position = Math.max(-45, Math.min(45, position)); // Clamp between -45 and 45
+                let transformValue = (position / 45) * 100; // Map to percentage
+                indicator.style.transform = `translateX(${transformValue}%)`;
+            }
 
             // Adjust so 35 degrees becomes the new "neutral" point (equal volume for both sources)
             const offsetBeta = beta - 20;
@@ -194,6 +240,10 @@
 
             gainNode1.gain.value = 1 - normalized; // Crossfade: decrease gain for channels 1, 2
             gainNode2.gain.value = normalized; // Crossfade: increase gain for channels 3, 4
+
+            // Update the image opacity based on the audio crossfade
+            image1.style.opacity = 1 - normalized; // When audio channels 1, 2 are at full volume, image1 is fully visible
+            image2.style.opacity = normalized; // When audio channels 3, 4 are at full volume, image2 is fully visible
         }
 
         // Register the service worker

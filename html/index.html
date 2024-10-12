@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Device Orientation Audio Mixer (Howler.js)</title>
+    <title>Device Orientation Audio Mixer with Audio Pool</title>
     <style>
-        /* [Styles remain the same] */
         body {
             font-family: Arial, sans-serif;
             display: flex;
@@ -19,7 +18,7 @@
         h1 {
             margin-bottom: 20px;
         }
-        #output-orientation, #output-motion, #output-volume {
+        #output-orientation, #output-volume {
             font-size: 1.5rem;
             margin-bottom: 20px;
         }
@@ -51,8 +50,6 @@
             margin: 10px;
         }
     </style>
-    <!-- Include Howler.js library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
 </head>
 <body>
 
@@ -67,61 +64,59 @@
     <button id="restartButton">Restart</button>
 
     <script>
-        // Declare the sound variables without initializing
-        var soundA;
-        var soundB;
+        // Define the audio pool for each sound
+        const audioPoolA = [];
+        const audioPoolB = [];
+        const maxAudioElements = 5; // Number of audio elements in the pool
 
-        const playButton = document.getElementById('playButton');
-        const restartButton = document.getElementById('restartButton');
-        const outputVolume = document.getElementById('output-volume'); // Reference for volume output
+        // Preload audio into the pool
+        function preloadAudio() {
+            for (let i = 0; i < maxAudioElements; i++) {
+                const audioA = new Audio('audio/test.mp3'); // Path to your audio file
+                const audioB = new Audio('audio/test2.mp3'); // Path to your audio file
+                audioPoolA.push(audioA);
+                audioPoolB.push(audioB);
+            }
+        }
 
-        // Add event listener to the button to request permissions on user gesture
+        // Play sound from the pool
+        function playSound(pool) {
+            const audio = pool.find(a => a.paused);
+            if (audio) {
+                audio.currentTime = 0; // Reset to start
+                audio.play(); // Play the audio
+            }
+        }
+
+        let orientationPermissionGranted = false;
+
         document.getElementById('startButton').addEventListener('click', () => {
             requestOrientationPermission();
         });
 
-        playButton.addEventListener('click', () => {
-            // Initialize the Howl objects inside a user interaction
-            if (!soundA && !soundB) {
-                soundA = new Howl({
-                    src: ['test.mp3'],
-                    loop: true,
-                    volume: 0.5 // initial volume
-                });
-                soundB = new Howl({
-                    src: ['test2.mp3'],
-                    loop: true,
-                    volume: 0.5 // initial volume
-                });
-            }
-
-            // Resume AudioContext if suspended (iOS fix)
-            if (Howler.ctx.state === 'suspended') {
-                Howler.ctx.resume().then(() => {
-                    soundA.play();
-                    soundB.play();
-                });
-            } else {
-                soundA.play();
-                soundB.play();
+        document.getElementById('playButton').addEventListener('click', async () => {
+            // Start playing sounds if orientation permission is granted
+            if (orientationPermissionGranted) {
+                playSound(audioPoolA);
+                playSound(audioPoolB);
             }
         });
 
-        restartButton.addEventListener('click', () => {
-            if (soundA && soundB) {
-                soundA.stop();
-                soundB.stop();
-                soundA.play();
-                soundB.play();
-            }
+        document.getElementById('restartButton').addEventListener('click', () => {
+            // Restart both sounds
+            audioPoolA.forEach(audio => audio.pause());
+            audioPoolB.forEach(audio => audio.pause());
+            playSound(audioPoolA);
+            playSound(audioPoolB);
         });
 
         function requestOrientationPermission() {
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                // Request permission for device orientation
                 DeviceOrientationEvent.requestPermission()
                     .then(permissionState => {
                         if (permissionState === 'granted') {
+                            orientationPermissionGranted = true;
+                            preloadAudio(); // Preload audio files after permission is granted
                             initializeOrientationListener();
                         } else {
                             alert('Permission denied for accessing orientation data.');
@@ -129,56 +124,56 @@
                     })
                     .catch(console.error);
             } else {
-                // No permission required for non-iOS devices
+                orientationPermissionGranted = true;
+                preloadAudio(); // Preload audio files for non-iOS devices
                 initializeOrientationListener();
             }
         }
 
         function initializeOrientationListener() {
-            // Handle device orientation events
             window.addEventListener("deviceorientation", handleOrientation);
-
-            function handleOrientation(event) {
-                const gamma = event.gamma; // Left-to-right tilt (gamma)
-
-                // Update the text output for orientation
-                const outputOrientation = document.getElementById('output-orientation');
-                outputOrientation.textContent = `Orientation: ${gamma.toFixed(2)}°`;
-
-                // Move the indicator to reflect rotation
-                const indicator = document.getElementById('indicator');
-                let position = gamma; // gamma is between -90 and 90
-                position = Math.max(-45, Math.min(45, position)); // Clamp between -45 and 45
-                let transformValue = (position / 45) * 100; // Map to percentage
-                indicator.style.transform = `translateX(${transformValue}%)`;
-
-                // Map gamma (-45 to 45) to volumes for songA and songB
-                let volumeA, volumeB;
-                if (gamma <= -45) {
-                    volumeA = 1; // Full volume for songA
-                    volumeB = 0; // Mute songB
-                } else if (gamma >= 45) {
-                    volumeA = 0; // Mute songA
-                    volumeB = 1; // Full volume for songB
-                } else {
-                    // Calculate volumes based on tilt
-                    // Normalize gamma from -45 to 45 into a range of 0 to 1
-                    let normalized = (gamma + 45) / 90;
-                    volumeA = 1 - normalized; // Inverse for songA
-                    volumeB = normalized;     // Direct for songB
-                }
-
-                // Set the volumes on the Howl objects if they're initialized
-                if (soundA && soundB) {
-                    // Note: Programmatic volume changes may not work on iOS
-                    soundA.volume(volumeA);
-                    soundB.volume(volumeB);
-                }
-
-                // Update the displayed volumes for debugging
-                outputVolume.textContent = `Song A Volume: ${volumeA.toFixed(2)} | Song B Volume: ${volumeB.toFixed(2)}`;
-            }
         }
+
+        function handleOrientation(event) {
+            const gamma = event.gamma; // Left-to-right tilt (gamma)
+
+            // Update the text output for orientation
+            const outputOrientation = document.getElementById('output-orientation');
+            outputOrientation.textContent = `Orientation: ${gamma.toFixed(2)}°`;
+
+            // Move the indicator to reflect rotation
+            const indicator = document.getElementById('indicator');
+            let position = gamma; // gamma is between -90 and 90
+            position = Math.max(-45, Math.min(45, position)); // Clamp between -45 and 45
+            let transformValue = (position / 45) * 100; // Map to percentage
+            indicator.style.transform = `translateX(${transformValue}%)`;
+
+            // Map gamma (-45 to 45) to volumes for songA and songB
+            let volumeA, volumeB;
+            if (gamma <= -45) {
+                volumeA = 1; // Full volume for songA
+                volumeB = 0; // Mute songB
+            } else if (gamma >= 45) {
+                volumeA = 0; // Mute songA
+                volumeB = 1; // Full volume for songB
+            } else {
+                // Calculate volumes based on tilt
+                let normalized = (gamma + 45) / 90; // Normalize gamma
+                volumeA = 1 - normalized; // Inverse for songA
+                volumeB = normalized; // Direct for songB
+            }
+
+            // Update volume of audio elements in the pool
+            audioPoolA.forEach(audio => audio.volume = volumeA);
+            audioPoolB.forEach(audio => audio.volume = volumeB);
+
+            // Update the displayed volumes for debugging
+            const outputVolume = document.getElementById('output-volume');
+            outputVolume.textContent = `Song A Volume: ${volumeA.toFixed(2)} | Song B Volume: ${volumeB.toFixed(2)}`;
+        }
+
+        // Preload audio files on page load
+        preloadAudio();
     </script>
 
 </body>

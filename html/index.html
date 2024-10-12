@@ -402,6 +402,45 @@
             updateMix(normalized);
         }
 
+        // Wake Lock API for preventing the screen from turning off
+        let wakeLock = null;
+
+        // Request a wake lock
+        async function requestWakeLock() {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log('Wake Lock activated!');
+                
+                // Re-activate wake lock when it is released
+                wakeLock.addEventListener('release', () => {
+                    console.log('Wake Lock was released');
+                });
+            } catch (err) {
+                console.error(`${err.name}, ${err.message}`);
+            }
+        }
+
+        // Release the wake lock when it is not needed anymore
+        function releaseWakeLock() {
+            if (wakeLock !== null) {
+                wakeLock.release()
+                    .then(() => {
+                        console.log('Wake Lock released');
+                        wakeLock = null;
+                    });
+            }
+        }
+
+        // Request wake lock when page is loaded
+        window.addEventListener('load', () => {
+            requestWakeLock();
+        });
+
+        // Release the wake lock when page is closed or user navigates away
+        window.addEventListener('beforeunload', () => {
+            releaseWakeLock();
+        });
+
         // Register the service worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {

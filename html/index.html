@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Wassermusik</title>
-    
 
     <!-- Styles -->
     <style>
@@ -119,6 +118,25 @@
             font-size: 1.2rem;
             margin-top: 10px;
         }
+        /* Add styles for progress bar */
+        #progress-container {
+            width: 80%;
+            height: 10px;
+            background-color: #444;
+            margin-top: 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #007bff;
+        }
+        #time-display {
+            margin-top: 5px;
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -151,8 +169,7 @@
         <div id="progress-bar"></div>
     </div>
     <div id="time-display">0:00 / 0:00</div>
-    <!-- Audio Player -->
-    <audio id="audio-player" src="audio/version5.m4a" preload="none"></audio>
+    <!-- Removed Audio Player -->
 
     <!-- Script -->
     <script>
@@ -162,7 +179,6 @@
         let isPlaying = false; // Track if the audio is playing
 
         // Existing element references
-        const audioPlayer = document.getElementById('audio-player');
         const startButton = document.getElementById('startButton');
         const loadingIndicator = document.getElementById('loading-indicator');
         const outputOrientation = document.getElementById('output-orientation');
@@ -177,6 +193,13 @@
         // New element references
         const sliderContainer = document.getElementById('slider-container');
         const mixerSlider = document.getElementById('mixerSlider');
+
+        // Variables for Web Audio API
+        let audioBuffer = null;
+        let audioSource = null;
+        let audioDuration = 0;
+        let audioStartTime = 0;
+        let progressInterval = null;
 
         // Function to detect mobile devices
         function isMobileDevice() {
@@ -245,26 +268,14 @@
         // Set up the Web Audio API context
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-        // Set up audio source
-        const audioSource = audioContext.createMediaElementSource(audioPlayer);
-
         // Create a ChannelSplitterNode to split the 4-channel audio into individual channels
         const splitter = audioContext.createChannelSplitter(4);
-
-        // Connect the audio source to the splitter
-        audioSource.connect(splitter);
 
         // Create GainNodes for each individual channel
         const gainNode1_L = audioContext.createGain(); // Channel 1 (left of stereo pair 1)
         const gainNode1_R = audioContext.createGain(); // Channel 2 (right of stereo pair 1)
         const gainNode2_L = audioContext.createGain(); // Channel 3 (left of stereo pair 2)
         const gainNode2_R = audioContext.createGain(); // Channel 4 (right of stereo pair 2)
-
-        // Connect splitter outputs to their respective GainNodes
-        splitter.connect(gainNode1_L, 0); // Channel 1 to gainNode1_L
-        splitter.connect(gainNode1_R, 1); // Channel 2 to gainNode1_R
-        splitter.connect(gainNode2_L, 2); // Channel 3 to gainNode2_L
-        splitter.connect(gainNode2_R, 3); // Channel 4 to gainNode2_R
 
         // Create a ChannelMergerNode to merge the left and right channels back into stereo
         const merger = audioContext.createChannelMerger(2);
@@ -283,57 +294,110 @@
         gainNode2_L.gain.value = gainNode2_R.gain.value = 0.5;
 
         startButton.addEventListener('click', () => {
-            const title = document.querySelector('h1');
-            if (!isPlaying) {
-                if (isMobileDevice()) {
-                    // Request orientation permission
-                    requestOrientationPermission();
-                }
-                downloadAudio();
-                startButton.textContent = 'Stop';
-                title.style.opacity = '0'; // Fade out the instruction text
-            } else {
-                audioPlayer.pause();
-                audioContext.suspend();
-                startButton.textContent = 'Start';
-                title.style.opacity = '1'; // Fade in the instruction text
-            }
-            isPlaying = !isPlaying;
+    const title = document.querySelector('h1');
+    if (!isPlaying) {
+        if (isMobileDevice()) {
+            // Request orientation permission for mobile devices (iOS especially)
+            requestOrientationPermission();
+        }
+        loadAudio();
+        startButton.textContent = 'Stop';
+        title.style.opacity = '0'; // Fade out instruction text
+    } else {
+        stopAudio();
+        startButton.textContent = 'Start';
+        title.style.opacity = '1'; // Fade in instruction text
+    }
+    isPlaying = !isPlaying;
+});
+
+function loadAudio() {
+    if (audioBuffer) {
+        // Audio is already loaded, play it
+        playAudio();
+        return;
+    }
+
+    // Show loading indicator
+    loadingIndicator.style.display = 'block';
+    startButton.disabled = true;
+
+    // Fetch and decode the audio data
+    fetch('audio/version5.m4a')
+        .then(response => response.arrayBuffer())
+        .then(arrayBuffer => audioContext.decodeAudioData(arrayBuffer))
+        .then(decodedData => {
+            audioBuffer = decodedData;
+            loadingIndicator.style.display = 'none'; // Hide loading indicator
+            startButton.disabled = false;
+            playAudio(); // Play audio once loaded
+        })
+        .catch(error => {
+            console.error('Error loading audio:', error);
         });
+}
 
-        function downloadAudio() {
-            // Show loading indicator and disable the button
-            loadingIndicator.style.display = 'block';
-            startButton.disabled = true;
+function playAudio() {
+    audioContext.resume().then(() => {
+        // Create a new buffer source
+        audioSource = audioContext.createBufferSource();
+        audioSource.buffer = audioBuffer;
 
-            // Resume the audio context
-            audioContext.resume();
+        // Connect the audio source to the splitter and gain nodes
+        audioSource.connect(splitter);
+        splitter.connect(gainNode1_L, 0);
+        splitter.connect(gainNode1_R, 1);
+        splitter.connect(gainNode2_L, 2);
+        splitter.connect(gainNode2_R, 3);
 
-            // Set up event listener for 'loadeddata' event
-            audioPlayer.addEventListener('loadeddata', () => {
-                // Hide loading indicator and enable the button
-                loadingIndicator.style.display = 'none';
-                startButton.disabled = false;
+        // Start the audio
+        audioStartTime = audioContext.currentTime;
+        audioDuration = audioBuffer.duration;
+        audioSource.start(0);
 
-                // Play the audio file after it has fully downloaded
-                audioPlayer.play();
-            });
+        // Start progress update
+        startProgressUpdate();
 
-            // Explicitly preload the entire audio file
-            audioPlayer.load(); // Begin downloading the audio file
+        // Handle audio end event
+        audioSource.onended = () => {
+            stopAudio();
+            startButton.textContent = 'Start';
+            isPlaying = false;
+        };
+    });
+}
+
+        function stopAudio() {
+            if (audioSource) {
+                audioSource.stop();
+                audioSource.disconnect();
+                audioSource = null;
+            }
+            audioContext.suspend();
+            stopProgressUpdate();
         }
 
-        // Update the progress bar as the audio plays
-        audioPlayer.addEventListener('timeupdate', updateProgressBar);
+        function startProgressUpdate() {
+            progressInterval = setInterval(updateProgressBar, 100);
+        }
+
+        function stopProgressUpdate() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+        }
 
         function updateProgressBar() {
-            if (audioPlayer.duration) {
-                const progressPercent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+            const currentTime = audioContext.currentTime - audioStartTime;
+
+            if (audioDuration) {
+                const progressPercent = (currentTime / audioDuration) * 100;
                 progressBar.style.width = `${progressPercent}%`;
 
                 // Update time display
-                const currentTimeFormatted = formatTime(audioPlayer.currentTime);
-                const durationFormatted = formatTime(audioPlayer.duration);
+                const currentTimeFormatted = formatTime(currentTime);
+                const durationFormatted = formatTime(audioDuration);
                 timeDisplay.textContent = `${currentTimeFormatted} / ${durationFormatted}`;
             }
         }
@@ -348,10 +412,45 @@
         progressContainer.addEventListener('click', (e) => {
             const width = progressContainer.clientWidth;
             const clickX = e.offsetX;
-            const duration = audioPlayer.duration;
+            const duration = audioDuration;
 
-            audioPlayer.currentTime = (clickX / width) * duration;
+            const seekTime = (clickX / width) * duration;
+            seekAudio(seekTime);
         });
+
+        function seekAudio(seekTime) {
+            if (audioSource) {
+                audioSource.stop();
+                audioSource.disconnect();
+            }
+
+            audioSource = audioContext.createBufferSource();
+            audioSource.buffer = audioBuffer;
+
+            // Connect the audioSource to the splitter
+            audioSource.connect(splitter);
+
+            // Connect splitter outputs to their respective GainNodes
+            splitter.connect(gainNode1_L, 0); // Channel 1 to gainNode1_L
+            splitter.connect(gainNode1_R, 1); // Channel 2 to gainNode1_R
+            splitter.connect(gainNode2_L, 2); // Channel 3 to gainNode2_L
+            splitter.connect(gainNode2_R, 3); // Channel 4 to gainNode2_R
+
+            audioSource.onended = () => {
+                stopAudio();
+                startButton.textContent = 'Start';
+                isPlaying = false;
+            };
+
+            audioStartTime = audioContext.currentTime - seekTime;
+
+            // Start playing from seekTime
+            audioSource.start(0, seekTime);
+
+            // Restart progress updates
+            stopProgressUpdate();
+            startProgressUpdate();
+        }
 
         function requestOrientationPermission() {
             if (typeof DeviceOrientationEvent.requestPermission === 'function') {

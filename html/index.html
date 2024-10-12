@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Orientation Audio Mixer</title>
+
+    <!-- Link to manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Theme color for the browser -->
+    <meta name="theme-color" content="#007bff">
+
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -68,7 +75,7 @@
 </head>
 <body>
 
-    <h1>Rotate Your Phone to Mix Audio</h1>
+    <h1>Tilt Your Phone to Mix Audio</h1>
     <div id="output-orientation">Orientation: 0°</div>
     <div id="rotation-bar">
         <div id="indicator"></div>
@@ -78,40 +85,43 @@
     <!-- Loading Indicator -->
     <div id="loading-indicator"></div>
 
-    <!-- First Audio Player -->
-    <audio id="audio-player1" src="wasser.mp3" preload="none"></audio>
-    <!-- Second Audio Player -->
-    <audio id="audio-player2" src="orchester.mp3" preload="none"></audio>
+    <!-- Single Audio Player -->
+    <audio id="audio-player" src="audio/output.flac" preload="none"></audio>
 
     <script>
         let orientationPermissionGranted = false;
 
-        const audioPlayer1 = document.getElementById('audio-player1');
-        const audioPlayer2 = document.getElementById('audio-player2');
+        const audioPlayer = document.getElementById('audio-player');
         const startButton = document.getElementById('startButton');
         const loadingIndicator = document.getElementById('loading-indicator');
 
         // Set up the Web Audio API context
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
         
-        // Set up first audio source and gain node
-        const audioSource1 = audioContext.createMediaElementSource(audioPlayer1);
-        const gainNode1 = audioContext.createGain();
+        // Set up audio source and gain nodes for different channels
+        const audioSource = audioContext.createMediaElementSource(audioPlayer);
+        const gainNode1 = audioContext.createGain(); // Gain for channels 1, 2 (left, right)
+        const gainNode2 = audioContext.createGain(); // Gain for channels 3, 4 (left, right)
 
-        // Set up second audio source and gain node
-        const audioSource2 = audioContext.createMediaElementSource(audioPlayer2);
-        const gainNode2 = audioContext.createGain();
+        // Create a channel splitter for the 4-channel audio
+        const splitter = audioContext.createChannelSplitter(4);
 
-        // Connect the audio elements to their respective GainNodes and then to the destination (speakers)
-        audioSource1.connect(gainNode1);
+        // Connect channels 1, 2 to gainNode1 (left, right)
+        audioSource.connect(splitter);
+        splitter.connect(gainNode1, 0); // Channel 1 (left) to gainNode1 left
+        splitter.connect(gainNode1, 1); // Channel 2 (right) to gainNode1 right
+
+        // Connect channels 3, 4 to gainNode2 (left, right)
+        splitter.connect(gainNode2, 2); // Channel 3 (left) to gainNode2 left
+        splitter.connect(gainNode2, 3); // Channel 4 (right) to gainNode2 right
+
+        // Connect the gain nodes to the audio context destination (speakers)
         gainNode1.connect(audioContext.destination);
-
-        audioSource2.connect(gainNode2);
         gainNode2.connect(audioContext.destination);
 
-        // Set initial volume for both audios
+        // Set initial volume for both gains (both start at full volume)
         gainNode1.gain.value = 1.0;
-        gainNode2.gain.value = 1.0;
+        gainNode2.gain.value = 0.0; // Initially mute the second pair of channels
 
         startButton.addEventListener('click', () => {
             // Request orientation permission and start preloading the audio
@@ -120,32 +130,23 @@
         });
 
         function preloadAudio() {
-            let audioLoadedCount = 0;
-
             // Show loading indicator
             loadingIndicator.style.display = 'block';
 
             // Resume the audio context
             audioContext.resume();
 
-            function checkAllAudioLoaded() {
-                audioLoadedCount++;
-                if (audioLoadedCount === 2) {
-                    // Hide loading indicator
-                    loadingIndicator.style.display = 'none';
-                    // Play both audio files
-                    audioPlayer1.play();
-                    audioPlayer2.play();
-                }
-            }
+            // Set up event listener for 'canplaythrough'
+            audioPlayer.addEventListener('canplaythrough', () => {
+                // Hide loading indicator
+                loadingIndicator.style.display = 'none';
+                // Play the audio file
+                audioPlayer.play();
+            }, { once: true });
 
-            // Set up event listeners for 'canplaythrough'
-            audioPlayer1.addEventListener('canplaythrough', checkAllAudioLoaded, { once: true });
-            audioPlayer2.addEventListener('canplaythrough', checkAllAudioLoaded, { once: true });
-
-            // Start loading the audio files
-            audioPlayer1.load();
-            audioPlayer2.load();
+            // Preload the audio file to ensure it is cached
+            audioPlayer.preload = 'auto';
+            audioPlayer.load();
         }
 
         function requestOrientationPermission() {
@@ -171,37 +172,48 @@
         }
 
         function handleOrientation(event) {
-            const gamma = event.gamma; // Left-to-right tilt (gamma)
+            const beta = event.beta; // Front-to-back tilt (beta)
 
             // Update the text output for orientation
             const outputOrientation = document.getElementById('output-orientation');
-            outputOrientation.textContent = `Orientation: ${gamma.toFixed(2)}°`;
+            outputOrientation.textContent = `Orientation: ${beta.toFixed(2)}°`;
 
             // Move the indicator to reflect rotation
             const indicator = document.getElementById('indicator');
-            let position = gamma; // gamma is between -90 and 90
+            let position = beta; // beta is between -180 and 180
             position = Math.max(-45, Math.min(45, position)); // Clamp between -45 and 45
             let transformValue = (position / 45) * 100; // Map to percentage
             indicator.style.transform = `translateX(${transformValue}%)`;
 
-            // Map gamma (-45 to 45) to volumes for songA and songB
-            let volumeA, volumeB;
-            if (gamma <= -45) {
-                volumeA = 1; // Full volume for songA
-                volumeB = 0; // Mute songB
-            } else if (gamma >= 45) {
-                volumeA = 0; // Mute songA
-                volumeB = 1; // Full volume for songB
-            } else {
-                // Calculate volumes based on tilt
-                let normalized = (gamma + 45) / 90; // Normalize gamma
-                volumeA = 1 - normalized; // Inverse for songA
-                volumeB = normalized; // Direct for songB
-            }
+            // Adjust so 35 degrees becomes the new "neutral" point (equal volume for both sources)
+            const offsetBeta = beta - 20;
 
-            // Update volume of audio elements using GainNodes
-            gainNode1.gain.value = volumeA;
-            gainNode2.gain.value = volumeB;
+            // Map offsetBeta (-45 to 45) to adjust gain between the two stereo pairs
+            let normalized = (offsetBeta + 45) / 90; // Normalize offsetBeta to a value between 0 and 1
+            normalized = Math.max(0, Math.min(1, normalized)); // Clamp normalized between 0 and 1
+
+            gainNode1.gain.value = 1 - normalized; // Crossfade: decrease gain for channels 1, 2
+            gainNode2.gain.value = normalized; // Crossfade: increase gain for channels 3, 4
+        }
+
+        // Register the service worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+
+        // Lock screen orientation to portrait mode
+        if (screen.orientation && screen.orientation.lock) {
+            screen.orientation.lock('portrait').catch(function(error) {
+                console.log('Screen orientation lock failed:', error);
+            });
         }
     </script>
 

@@ -21,13 +21,19 @@
             height: 100vh;
             margin: 0;
             background-color: #f0f0f0;
+            color: white; /* Make the text white */
+            background-color: #333; /* Change background for better contrast */
         }
         h1 {
             margin-bottom: 20px;
+            padding: 20px;
+            color: white; /* Make the h1 text white */
+            text-align: center;
         }
         #output-orientation {
             font-size: 1.5rem;
             margin-bottom: 20px;
+            color: white; /* Make the output-orientation text white */
         }
         #rotation-bar {
             width: 300px;
@@ -50,7 +56,7 @@
             padding: 10px 20px;
             font-size: 1rem;
             cursor: pointer;
-            background-color: #28a745;
+            background-color: #007bff;
             color: white;
             border: none;
             border-radius: 5px;
@@ -110,11 +116,12 @@
     <div id="loading-indicator"></div>
 
     <!-- Single Audio Player -->
-    <audio id="audio-player" src="audio/output.flac" preload="none"></audio>
+    <audio id="audio-player" src="audio/version2.flac" preload="auto"></audio> <!-- preload set to 'auto' -->
 
     <script>
         let orientationPermissionGranted = false;
         let debug = false; // Set debug mode to false by default
+        let isPlaying = false; // Track if the audio is playing
 
         const audioPlayer = document.getElementById('audio-player');
         const startButton = document.getElementById('startButton');
@@ -140,56 +147,79 @@
 
         // Set up the Web Audio API context
         const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
-        // Set up audio source and gain nodes for different channels
-        const audioSource = audioContext.createMediaElementSource(audioPlayer);
-        const gainNode1 = audioContext.createGain(); // Gain for channels 1, 2 (left, right)
-        const gainNode2 = audioContext.createGain(); // Gain for channels 3, 4 (left, right)
 
-        // Create a channel splitter for the 4-channel audio
+        // Set up audio source
+        const audioSource = audioContext.createMediaElementSource(audioPlayer);
+
+        // Create a ChannelSplitterNode to split the 4-channel audio into individual channels
         const splitter = audioContext.createChannelSplitter(4);
 
-        // Connect channels 1, 2 to gainNode1 (left, right)
+        // Connect the audio source to the splitter
         audioSource.connect(splitter);
-        splitter.connect(gainNode1, 0); // Channel 1 (left) to gainNode1 left
-        splitter.connect(gainNode1, 1); // Channel 2 (right) to gainNode1 right
 
-        // Connect channels 3, 4 to gainNode2 (left, right)
-        splitter.connect(gainNode2, 2); // Channel 3 (left) to gainNode2 left
-        splitter.connect(gainNode2, 3); // Channel 4 (right) to gainNode2 right
+        // Create GainNodes for each individual channel
+        const gainNode1_L = audioContext.createGain(); // Channel 1 (left of stereo pair 1)
+        const gainNode1_R = audioContext.createGain(); // Channel 2 (right of stereo pair 1)
+        const gainNode2_L = audioContext.createGain(); // Channel 3 (left of stereo pair 2)
+        const gainNode2_R = audioContext.createGain(); // Channel 4 (right of stereo pair 2)
 
-        // Connect the gain nodes to the audio context destination (speakers)
-        gainNode1.connect(audioContext.destination);
-        gainNode2.connect(audioContext.destination);
+        // Connect splitter outputs to their respective GainNodes
+        splitter.connect(gainNode1_L, 0); // Channel 1 to gainNode1_L
+        splitter.connect(gainNode1_R, 1); // Channel 2 to gainNode1_R
+        splitter.connect(gainNode2_L, 2); // Channel 3 to gainNode2_L
+        splitter.connect(gainNode2_R, 3); // Channel 4 to gainNode2_R
 
-        // Set initial volume for both gains (both start at full volume)
-        gainNode1.gain.value = 1.0;
-        gainNode2.gain.value = 0.0; // Initially mute the second pair of channels
+        // Create a ChannelMergerNode to merge the left and right channels back into stereo
+        const merger = audioContext.createChannelMerger(2);
+
+        // Connect the GainNodes to the merger
+        // Left channels to input 0 (left)
+        gainNode1_L.connect(merger, 0, 0);
+        gainNode2_L.connect(merger, 0, 0);
+
+        // Right channels to input 1 (right)
+        gainNode1_R.connect(merger, 0, 1);
+        gainNode2_R.connect(merger, 0, 1);
+
+        // Connect the merger to the audio context destination (speakers)
+        merger.connect(audioContext.destination);
+
+        // Set initial gains for crossfading
+        gainNode1_L.gain.value = gainNode1_R.gain.value = 1.0;
+        gainNode2_L.gain.value = gainNode2_R.gain.value = 0.0;
 
         startButton.addEventListener('click', () => {
-            // Request orientation permission and start preloading the audio
-            requestOrientationPermission();
-            preloadAudio();
+            if (!isPlaying) {
+                // Request orientation permission and start downloading the audio
+                requestOrientationPermission();
+                downloadAudio();
+                startButton.textContent = 'Stop';
+                startButton.style.backgroundColor = '#007bff'; // Change color to blue
+            } else {
+                audioPlayer.pause();
+                audioContext.suspend();
+                startButton.textContent = 'Start';
+            }
+            isPlaying = !isPlaying;
         });
 
-        function preloadAudio() {
+        function downloadAudio() {
             // Show loading indicator
             loadingIndicator.style.display = 'block';
 
             // Resume the audio context
             audioContext.resume();
 
-            // Set up event listener for 'canplaythrough'
-            audioPlayer.addEventListener('canplaythrough', () => {
+            // Set up event listener for 'loadeddata' event (fired when the entire audio is loaded)
+            audioPlayer.addEventListener('loadeddata', () => {
                 // Hide loading indicator
                 loadingIndicator.style.display = 'none';
-                // Play the audio file
+                // Play the audio file after it has fully downloaded
                 audioPlayer.play();
-            }, { once: true });
+            });
 
-            // Preload the audio file to ensure it is cached
-            audioPlayer.preload = 'auto';
-            audioPlayer.load();
+            // Explicitly preload the entire audio file
+            audioPlayer.load(); // Begin downloading the audio file
         }
 
         function requestOrientationPermission() {
@@ -238,8 +268,9 @@
             let normalized = (offsetBeta + 45) / 90; // Normalize offsetBeta to a value between 0 and 1
             normalized = Math.max(0, Math.min(1, normalized)); // Clamp normalized between 0 and 1
 
-            gainNode1.gain.value = 1 - normalized; // Crossfade: decrease gain for channels 1, 2
-            gainNode2.gain.value = normalized; // Crossfade: increase gain for channels 3, 4
+            // Adjust gains for crossfading
+            gainNode1_L.gain.value = gainNode1_R.gain.value = 1 - normalized;
+            gainNode2_L.gain.value = gainNode2_R.gain.value = normalized;
 
             // Update the image opacity based on the audio crossfade
             image1.style.opacity = 1 - normalized; // When audio channels 1, 2 are at full volume, image1 is fully visible

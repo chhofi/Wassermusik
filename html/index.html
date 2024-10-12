@@ -39,7 +39,7 @@
             transform-origin: center;
             transition: transform 0.1s;
         }
-        #startButton, #playButton {
+        #startButton {
             padding: 10px 20px;
             font-size: 1rem;
             cursor: pointer;
@@ -74,7 +74,6 @@
         <div id="indicator"></div>
     </div>
     <button id="startButton">Start</button>
-    <button id="playButton">Play Audio</button>
 
     <!-- Loading Indicator -->
     <div id="loading-indicator"></div>
@@ -89,7 +88,7 @@
 
         const audioPlayer1 = document.getElementById('audio-player1');
         const audioPlayer2 = document.getElementById('audio-player2');
-        const playButton = document.getElementById('playButton');
+        const startButton = document.getElementById('startButton');
         const loadingIndicator = document.getElementById('loading-indicator');
 
         // Set up the Web Audio API context
@@ -114,20 +113,17 @@
         gainNode1.gain.value = 1.0;
         gainNode2.gain.value = 1.0;
 
-        document.getElementById('startButton').addEventListener('click', () => {
+        startButton.addEventListener('click', () => {
+            // Request orientation permission and start preloading the audio
             requestOrientationPermission();
-        });
-
-        playButton.addEventListener('click', () => {
-            // Show loading indicator
-            loadingIndicator.style.display = 'block';
-
-            // Start preloading the audio files
             preloadAudio();
         });
 
         function preloadAudio() {
             let audioLoadedCount = 0;
+
+            // Show loading indicator
+            loadingIndicator.style.display = 'block';
 
             // Resume the audio context
             audioContext.resume();

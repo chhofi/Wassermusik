@@ -3,9 +3,9 @@ version: '3.8'
 services:
   webserver:
     image: nginx:latest
-    container_name: wassermusik
+    container_name: wassermusik_${PROJECT_NAME}  # Dynamic container name based on the project
     ports:
-      - "3562:80"
+      - "${PORT}:80"
     volumes:
       - ./html:/usr/share/nginx/html
       - ./nginx.conf:/etc/nginx/nginx.conf
@@ -13,10 +13,10 @@ services:
       - runner
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.wassermusik.rule=Host(`${DOMAIN}`)"
-      - "traefik.http.routers.wassermusik.entrypoints=websecure"
-      - "traefik.http.routers.wassermusik.tls.certresolver=myresolver"
-      - "traefik.http.services.wassermusik.loadbalancer.server.port=80"
+      - "traefik.http.routers.wassermusik_${PROJECT_NAME}.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.wassermusik_${PROJECT_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.wassermusik_${PROJECT_NAME}.tls.certresolver=myresolver"
+      - "traefik.http.services.wassermusik_${PROJECT_NAME}.loadbalancer.server.port=80"
       - "com.centurylinklabs.watchtower.enable=true"  # Label to allow Watchtower updates
 
 networks:

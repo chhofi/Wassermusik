@@ -13,7 +13,7 @@ if ('serviceWorker' in navigator) {
 
 // Existing variables
 let orientationPermissionGranted = false;
-let debug = true; // Set debug mode to false by default
+let debug = false; // Set debug mode to false by default
 let isPlaying = false; // Track if the audio is playing
 
 // Existing element references
@@ -141,15 +141,7 @@ merger.connect(audioContext.destination);
 gainNode1_L.gain.value = gainNode1_R.gain.value = 0.5;
 gainNode2_L.gain.value = gainNode2_R.gain.value = 0.5;
 
-// --- Wake Lock Functionality with NoSleep.js ---
-
-// Initialize NoSleep.js
-const noSleep = new NoSleep();
-
-// Flag to track wake lock state
-let wakeLockEnabled = false;
-
-// Event listener for the start button to enable wake lock
+// Event listener for the start button to play and stop audio
 if (startButton) {
     startButton.addEventListener('click', () => {
         const title = document.querySelector('h1');
@@ -161,24 +153,10 @@ if (startButton) {
             loadAudio();
             startButton.textContent = 'Stop';
             title.style.opacity = '0'; // Fade out instruction text
-
-            // Enable NoSleep.js to keep the screen awake
-            if (!wakeLockEnabled) {
-                noSleep.enable(); // Enable wake lock to keep the screen on
-                wakeLockEnabled = true;
-                console.log('Wake Lock enabled via NoSleep.js');
-            }
         } else {
             stopAudio();
             startButton.textContent = 'Start';
             title.style.opacity = '1'; // Fade in instruction text
-
-            // Disable NoSleep.js to allow the screen to turn off
-            if (wakeLockEnabled) {
-                noSleep.disable(); // Disable wake lock to allow screen to turn off
-                wakeLockEnabled = false;
-                console.log('Wake Lock disabled via NoSleep.js');
-            }
         }
         isPlaying = !isPlaying;
     });
@@ -238,13 +216,6 @@ function playAudio() {
             stopAudio();
             startButton.textContent = 'Start';
             isPlaying = false;
-
-            // Optionally disable NoSleep.js when audio ends
-            if (wakeLockEnabled) {
-                noSleep.disable();
-                wakeLockEnabled = false;
-                console.log('Wake Lock disabled via NoSleep.js');
-            }
         };
     });
 }
@@ -257,13 +228,6 @@ function stopAudio() {
     }
     audioContext.suspend();
     stopProgressUpdate();
-
-    // Optionally disable NoSleep.js when stopping audio
-    if (wakeLockEnabled) {
-        noSleep.disable();
-        wakeLockEnabled = false;
-        console.log('Wake Lock disabled via NoSleep.js');
-    }
 }
 
 function startProgressUpdate() {
@@ -329,13 +293,6 @@ function seekAudio(seekTime) {
         stopAudio();
         startButton.textContent = 'Start';
         isPlaying = false;
-
-        // Optionally disable NoSleep.js when audio ends
-        if (wakeLockEnabled) {
-            noSleep.disable();
-            wakeLockEnabled = false;
-            console.log('Wake Lock disabled via NoSleep.js');
-        }
     };
 
     audioStartTime = audioContext.currentTime - seekTime;

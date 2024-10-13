@@ -17,7 +17,8 @@ services:
       - "traefik.http.routers.wassermusik.entrypoints=websecure"
       - "traefik.http.routers.wassermusik.tls.certresolver=myresolver"
       - "traefik.http.services.wassermusik.loadbalancer.server.port=80"
-
+      - "com.centurylinklabs.watchtower.enable=true"  # Label to allow Watchtower updates
+      
 networks:
   runner:
     external: true

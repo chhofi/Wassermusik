@@ -25,4 +25,4 @@ jobs:
 
     - name: Deploy to server
       run: |
-        ssh root@188.245.45.177 'cd /root/Wassermusik && git pull origin main && docker-compose up -d'
+        ssh root@188.245.45.177 'cd /root/Wassermusik && git pull origin main && sudo docker compose up -d'

@@ -1,0 +1,28 @@
+name: Deploy to Hetzner
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up SSH
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIV_KEY }}" > ~/.ssh/id_rsa
+        echo "${{ secrets.SSH_PUB_KEY }}" > ~/.ssh/id_rsa.pub
+        chmod 600 ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa.pub
+
+        ssh-keyscan -H 188.245.45.177 >> ~/.ssh/known_hosts
+
+    - name: Deploy to server
+      run: |
+        ssh root@188.245.45.177 'cd /root/Wassermusik && git pull origin main && docker-compose up -d'

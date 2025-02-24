@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  webserver:
+    image: nginx:latest
+    container_name: wassermusik_${PROJECT_NAME}  # Dynamic container name based on the project
+    volumes:
+      - ./html:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    networks:
+      - runner
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.wassermusik_${PROJECT_NAME}.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.wassermusik_${PROJECT_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.wassermusik_${PROJECT_NAME}.tls.certresolver=myresolver"
+      - "traefik.http.services.wassermusik_${PROJECT_NAME}.loadbalancer.server.port=80"
+      - "com.centurylinklabs.watchtower.enable=true"  # Label to allow Watchtower updates
+
+  fastapi:
+    image: tiangolo/uvicorn-gunicorn-fastapi:latest  # Using the latest FastAPI image
+    container_name: fastapi_${PROJECT_NAME}
+    environment:
+      - MODULE_NAME=main  # The FastAPI app is defined in main.py
+      - PORT=8000
+      - UVICORN_RELOAD=true  # Enable auto-reload for development
+      - WATCHFILES_FORCE_POLLING=true
+    volumes:
+      - ./fastapi/app:/app  # Assuming your FastAPI app is stored here
+    networks:
+      - runner
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.fastapi_${PROJECT_NAME}.rule=Host(`${API_DOMAIN}`)"
+      - "traefik.http.routers.fastapi_${PROJECT_NAME}.entrypoints=websecure"
+      - "traefik.http.routers.fastapi_${PROJECT_NAME}.tls.certresolver=myresolver"
+      - "traefik.http.services.fastapi_${PROJECT_NAME}.loadbalancer.server.port=8000"
+      - "com.centurylinklabs.watchtower.enable=true"  # Label to allow Watchtower updates
+
+networks:
+  runner:
+    external: true
